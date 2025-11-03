@@ -1,4 +1,5 @@
 -- LocalScript ใน StarterPlayer > StarterPlayerScripts
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -18,7 +19,7 @@ local bodyVel
 local bodyGyro
 
 ---------------------------------------------------------------------
--- สร้าง GUI สำหรับมือถือ
+-- สร้าง GUI: ปุ่มหลัก + เมนูควบคุม (ซ่อนตอนแรก)
 ---------------------------------------------------------------------
 local function createFlyGui()
     local playerGui = player:WaitForChild("PlayerGui")
@@ -33,41 +34,74 @@ local function createFlyGui()
     screenGui.IgnoreGuiInset = true
     screenGui.Parent = playerGui
 
-    -- ปุ่มเปิด/ปิดบิน
-    local flyButton = Instance.new("TextButton")
-    flyButton.Name = "FlyButton"
-    flyButton.Size = UDim2.new(0, 140, 0, 50)
-    flyButton.Position = UDim2.new(0, 20, 1, -70) -- ล่างซ้าย
-    flyButton.Text = "Fly: OFF"
-    flyButton.Font = Enum.Font.SourceSansBold
-    flyButton.TextSize = 24
-    flyButton.BackgroundTransparency = 0.2
-    flyButton.Parent = screenGui
+    -- ปุ่มหลัก (ปุ่มเดียวที่เห็นตอนแรก)
+    local mainButton = Instance.new("TextButton")
+    mainButton.Name = "MainButton"
+    mainButton.Size = UDim2.new(0, 100, 0, 40)
+    mainButton.Position = UDim2.new(0, 20, 1, -70) -- ล่างซ้าย
+    mainButton.Text = "Fly"
+    mainButton.Font = Enum.Font.SourceSansBold
+    mainButton.TextSize = 24
+    mainButton.BackgroundTransparency = 0.2
+    mainButton.Parent = screenGui
 
-    -- ปุ่มบินขึ้น
+    -- Frame เก็บปุ่มย่อย (ซ่อนตอนเริ่ม)
+    local controlFrame = Instance.new("Frame")
+    controlFrame.Name = "ControlFrame"
+    controlFrame.Size = UDim2.new(0, 160, 0, 130)
+    controlFrame.Position = UDim2.new(0, 130, 1, -150) -- ใกล้ ๆ ปุ่มหลัก
+    controlFrame.BackgroundTransparency = 0.3
+    controlFrame.Visible = false
+    controlFrame.Parent = screenGui
+
+    -- ปุ่มเปิด/ปิดบิน
+    local flyToggle = Instance.new("TextButton")
+    flyToggle.Name = "FlyToggle"
+    flyToggle.Size = UDim2.new(1, -20, 0, 40)
+    flyToggle.Position = UDim2.new(0, 10, 0, 10)
+    flyToggle.Text = "Fly: OFF"
+    flyToggle.Font = Enum.Font.SourceSansBold
+    flyToggle.TextSize = 22
+    flyToggle.BackgroundTransparency = 0.2
+    flyToggle.Parent = controlFrame
+
+    -- ปุ่มขึ้น
     local upButton = Instance.new("TextButton")
     upButton.Name = "UpButton"
-    upButton.Size = UDim2.new(0, 80, 0, 40)
-    upButton.Position = UDim2.new(1, -110, 1, -130) -- ล่างขวา (ปุ่มบน)
+    upButton.Size = UDim2.new(1, -20, 0, 30)
+    upButton.Position = UDim2.new(0, 10, 0, 60)
     upButton.Text = "UP"
     upButton.Font = Enum.Font.SourceSansBold
-    upButton.TextSize = 22
+    upButton.TextSize = 20
     upButton.BackgroundTransparency = 0.2
-    upButton.Parent = screenGui
+    upButton.Parent = controlFrame
 
-    -- ปุ่มบินลง
+    -- ปุ่มลง
     local downButton = Instance.new("TextButton")
     downButton.Name = "DownButton"
-    downButton.Size = UDim2.new(0, 80, 0, 40)
-    downButton.Position = UDim2.new(1, -110, 1, -80) -- ล่างขวา (ปุ่มล่าง)
+    downButton.Size = UDim2.new(1, -20, 0, 30)
+    downButton.Position = UDim2.new(0, 10, 0, 95)
     downButton.Text = "DOWN"
     downButton.Font = Enum.Font.SourceSansBold
-    downButton.TextSize = 22
+    downButton.TextSize = 20
     downButton.BackgroundTransparency = 0.2
-    downButton.Parent = screenGui
+    downButton.Parent = controlFrame
 
-    -- กดปุ่ม Fly เพื่อเปิด/ปิดบิน
-    flyButton.MouseButton1Click:Connect(function()
+    -----------------------------------------------------------------
+    -- การทำงานของปุ่มหลัก: เปิด/ปิดเมนู
+    -----------------------------------------------------------------
+    mainButton.MouseButton1Click:Connect(function()
+        controlFrame.Visible = not controlFrame.Visible
+        -- ถ้าปิดเมนู ให้หยุดคำสั่งขึ้น/ลงด้วย
+        if not controlFrame.Visible then
+            moveUp = 0
+        }
+    end)
+
+    -----------------------------------------------------------------
+    -- ปุ่ม Fly: ON/OFF
+    -----------------------------------------------------------------
+    flyToggle.MouseButton1Click:Connect(function()
         flying = not flying
         if flying then
             hoverHeight = rootPart.Position.Y
@@ -76,7 +110,9 @@ local function createFlyGui()
         end
     end)
 
-    -- กดปุ่ม UP ค้าง = บินขึ้น
+    -----------------------------------------------------------------
+    -- ปุ่ม UP / DOWN (กดค้าง = ทำงาน, ปล่อย = หยุด)
+    -----------------------------------------------------------------
     upButton.MouseButton1Down:Connect(function()
         moveUp = 1
     end)
@@ -84,7 +120,6 @@ local function createFlyGui()
         moveUp = 0
     end)
 
-    -- กดปุ่ม DOWN ค้าง = บินลง
     downButton.MouseButton1Down:Connect(function()
         moveUp = -1
     end)
@@ -96,7 +131,8 @@ local function createFlyGui()
 end
 
 local flyGui = createFlyGui()
-local flyButton = flyGui:WaitForChild("FlyButton")
+local controlFrame = flyGui:WaitForChild("ControlFrame")
+local flyToggle = controlFrame:WaitForChild("FlyToggle")
 
 ---------------------------------------------------------------------
 -- ฟังก์ชันเริ่ม/หยุดบิน
@@ -137,9 +173,9 @@ end
 RunService.RenderStepped:Connect(function(dt)
     if not character or not humanoid or not rootPart then return end
 
-    -- อัปเดตข้อความบนปุ่ม
-    if flyButton then
-        flyButton.Text = flying and "Fly: ON" or "Fly: OFF"
+    -- อัปเดตข้อความบนปุ่ม Fly: ON/OFF
+    if flyToggle then
+        flyToggle.Text = flying and "Fly: ON" or "Fly: OFF"
     end
 
     if not flying then
@@ -155,7 +191,7 @@ RunService.RenderStepped:Connect(function(dt)
 
     if not bodyVel or not bodyGyro then return end
 
-    -- ใช้จอยซ้ายของ Roblox เป็นทิศทางบิน
+    -- ใช้จอยซ้าย (MoveDirection) เป็นทิศทางบิน
     local moveDir = humanoid.MoveDirection
     local horizontal = Vector3.new(moveDir.X, 0, moveDir.Z)
     if horizontal.Magnitude > 1 then
@@ -176,7 +212,7 @@ RunService.RenderStepped:Connect(function(dt)
 
     bodyVel.Velocity = Vector3.new(horizontalVelocity.X, yVel, horizontalVelocity.Z)
 
-    -- หันตัวไปตามทิศที่บิน
+    -- หันตัวไปทิศที่บิน
     local forward = horizontal.Magnitude > 0 and horizontal.Unit or rootPart.CFrame.LookVector
     local lookAt = Vector3.new(forward.X, 0, forward.Z)
     if lookAt.Magnitude > 0 then
