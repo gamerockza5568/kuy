@@ -1,15 +1,17 @@
--- LocalScript (มือถือ + PC ใช้ได้)
--- รวมระบบ: Fly + Invisibility + GUI เมนูเดียว
+-- LocalScript: MainClient
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+local invisEvent = ReplicatedStorage:WaitForChild("InvisibilityEvent")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
--- ====== ตั้งค่า ======
+-- ====== ตัวแปร ======
 local flying = false
 local invisible = false
 local flightSpeed = 60
@@ -20,7 +22,7 @@ local bodyVel
 local bodyGyro
 
 ------------------------------------------------------------
--- 🖥️ สร้าง GUI: ปุ่มเมนู + แผงควบคุม
+-- GUI
 ------------------------------------------------------------
 local function createGui()
 	local pg = player:WaitForChild("PlayerGui")
@@ -31,7 +33,6 @@ local function createGui()
 	gui.ResetOnSpawn = false
 	gui.Parent = pg
 
-	-- ปุ่มเมนูหลัก
 	local menuBtn = Instance.new("TextButton")
 	menuBtn.Name = "MenuButton"
 	menuBtn.Size = UDim2.new(0, 140, 0, 50)
@@ -42,7 +43,6 @@ local function createGui()
 	menuBtn.BackgroundTransparency = 0.2
 	menuBtn.Parent = gui
 
-	-- แผงควบคุม (ซ่อนไว้ก่อน)
 	local panel = Instance.new("Frame")
 	panel.Name = "ControlPanel"
 	panel.Size = UDim2.new(0, 220, 0, 210)
@@ -51,7 +51,6 @@ local function createGui()
 	panel.Visible = false
 	panel.Parent = gui
 
-	-- ปุ่มบิน
 	local flyBtn = Instance.new("TextButton")
 	flyBtn.Name = "FlyButton"
 	flyBtn.Size = UDim2.new(1, -20, 0, 50)
@@ -62,7 +61,6 @@ local function createGui()
 	flyBtn.BackgroundTransparency = 0.2
 	flyBtn.Parent = panel
 
-	-- ปุ่มหายตัว
 	local invisBtn = Instance.new("TextButton")
 	invisBtn.Name = "InvisButton"
 	invisBtn.Size = UDim2.new(1, -20, 0, 50)
@@ -73,7 +71,6 @@ local function createGui()
 	invisBtn.BackgroundTransparency = 0.2
 	invisBtn.Parent = panel
 
-	-- ปุ่มขึ้น
 	local upBtn = Instance.new("TextButton")
 	upBtn.Name = "UpButton"
 	upBtn.Size = UDim2.new(1, -20, 0, 40)
@@ -84,7 +81,6 @@ local function createGui()
 	upBtn.BackgroundTransparency = 0.2
 	upBtn.Parent = panel
 
-	-- ปุ่มลง
 	local downBtn = Instance.new("TextButton")
 	downBtn.Name = "DownButton"
 	downBtn.Size = UDim2.new(1, -20, 0, 40)
@@ -95,7 +91,6 @@ local function createGui()
 	downBtn.BackgroundTransparency = 0.2
 	downBtn.Parent = panel
 
-	-- เปิด/ปิดแผงเมนู
 	local panelOpen = false
 	menuBtn.MouseButton1Click:Connect(function()
 		panelOpen = not panelOpen
@@ -110,35 +105,29 @@ local function createGui()
 		if flying then hoverHeight = rootPart.Position.Y end
 	end)
 
-	-- ปุ่มหายตัว
+	-- ปุ่มหายตัว (สั่ง server)
 	invisBtn.MouseButton1Click:Connect(function()
 		invisible = not invisible
-		for _, part in ipairs(character:GetDescendants()) do
-			if part:IsA("BasePart") or part:IsA("Decal") then
-				part.Transparency = invisible and 1 or 0
-			end
-			if part:IsA("BillboardGui") then
-				part.Enabled = not invisible
-			end
-		end
+		invisEvent:FireServer(invisible)
 		invisBtn.Text = invisible and "Invisible: ON" or "Invisible: OFF"
 	end)
 
-	-- ปุ่ม UP/DOWN
+	-- ปุ่มขึ้น/ลง
 	upBtn.MouseButton1Down:Connect(function() moveUp = 1 end)
 	upBtn.MouseButton1Up:Connect(function() moveUp = 0 end)
 	upBtn.MouseLeave:Connect(function() moveUp = 0 end)
+
 	downBtn.MouseButton1Down:Connect(function() moveUp = -1 end)
 	downBtn.MouseButton1Up:Connect(function() moveUp = 0 end)
 	downBtn.MouseLeave:Connect(function() moveUp = 0 end)
 
-	return flyBtn, invisBtn
+	return flyBtn
 end
 
-local flyBtn, invisBtn = createGui()
+local flyBtn = createGui()
 
 ------------------------------------------------------------
--- ✈️ ฟังก์ชันบิน
+-- บิน
 ------------------------------------------------------------
 local function startFlying()
 	if bodyVel or bodyGyro then return end
@@ -161,18 +150,12 @@ local function stopFlying()
 end
 
 ------------------------------------------------------------
--- 🔄 Loop อัปเดตทุกเฟรม
+-- Loop
 ------------------------------------------------------------
 RunService.RenderStepped:Connect(function()
 	if flyBtn then flyBtn.Text = flying and "Fly: ON" or "Fly: OFF" end
-
-	if not flying then
-		if bodyVel or bodyGyro then stopFlying() end
-		return
-	end
-
+	if not flying then if bodyVel or bodyGyro then stopFlying() end return end
 	if not bodyVel or not bodyGyro then startFlying() end
-	if not bodyVel or not bodyGyro then return end
 
 	local moveDir = humanoid.MoveDirection
 	local horizontal = Vector3.new(moveDir.X, 0, moveDir.Z)
@@ -197,7 +180,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 ------------------------------------------------------------
--- ♻️ รีเซ็ตตอนรีสปอว์น
+-- รีเซ็ตตอนตาย
 ------------------------------------------------------------
 player.CharacterAdded:Connect(function(char)
 	character = char
