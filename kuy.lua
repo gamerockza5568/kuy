@@ -1,207 +1,198 @@
 -- LocalScript ใน StarterPlayer > StarterPlayerScripts
-
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
+
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
--- ตั้งค่าการบิน
 local flying = false
 local flightSpeed = 60
 local hoverHeight = rootPart.Position.Y
 
-local moveForward = 0
-local moveRight = 0
 local moveUp = 0
 
 local bodyVel
 local bodyGyro
 
--- =========================
--- สร้าง GUI ปุ่มบิน
--- =========================
+---------------------------------------------------------------------
+-- สร้าง GUI สำหรับมือถือ
+---------------------------------------------------------------------
 local function createFlyGui()
-	local playerGui = player:WaitForChild("PlayerGui")
+    local playerGui = player:WaitForChild("PlayerGui")
 
-	-- ถ้ามีอยู่แล้วไม่ต้องสร้างซ้ำ
-	if playerGui:FindFirstChild("FlyGui") then
-		return playerGui.FlyGui
-	end
+    if playerGui:FindFirstChild("FlyGui") then
+        return playerGui.FlyGui
+    end
 
-	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "FlyGui"
-	screenGui.ResetOnSpawn = false
-	screenGui.Parent = playerGui
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "FlyGui"
+    screenGui.ResetOnSpawn = false
+    screenGui.IgnoreGuiInset = true
+    screenGui.Parent = playerGui
 
-	local button = Instance.new("TextButton")
-	button.Name = "FlyButton"
-	button.Size = UDim2.new(0, 120, 0, 40)
-	button.Position = UDim2.new(0, 20, 0, 100) -- มุมซ้ายบน
-	button.Text = "Fly: OFF"
-	button.Font = Enum.Font.SourceSansBold
-	button.TextSize = 24
-	button.BackgroundTransparency = 0.2
-	button.Parent = screenGui
+    -- ปุ่มเปิด/ปิดบิน
+    local flyButton = Instance.new("TextButton")
+    flyButton.Name = "FlyButton"
+    flyButton.Size = UDim2.new(0, 140, 0, 50)
+    flyButton.Position = UDim2.new(0, 20, 1, -70) -- ล่างซ้าย
+    flyButton.Text = "Fly: OFF"
+    flyButton.Font = Enum.Font.SourceSansBold
+    flyButton.TextSize = 24
+    flyButton.BackgroundTransparency = 0.2
+    flyButton.Parent = screenGui
 
-	-- เวลากดปุ่มให้ toggle บิน
-	button.MouseButton1Click:Connect(function()
-		if flying then
-			-- ปิดบิน
-			flying = false
-		else
-			-- เปิดบิน
-			flying = true
-			hoverHeight = rootPart.Position.Y
-		end
-	end)
+    -- ปุ่มบินขึ้น
+    local upButton = Instance.new("TextButton")
+    upButton.Name = "UpButton"
+    upButton.Size = UDim2.new(0, 80, 0, 40)
+    upButton.Position = UDim2.new(1, -110, 1, -130) -- ล่างขวา (ปุ่มบน)
+    upButton.Text = "UP"
+    upButton.Font = Enum.Font.SourceSansBold
+    upButton.TextSize = 22
+    upButton.BackgroundTransparency = 0.2
+    upButton.Parent = screenGui
 
-	return screenGui
+    -- ปุ่มบินลง
+    local downButton = Instance.new("TextButton")
+    downButton.Name = "DownButton"
+    downButton.Size = UDim2.new(0, 80, 0, 40)
+    downButton.Position = UDim2.new(1, -110, 1, -80) -- ล่างขวา (ปุ่มล่าง)
+    downButton.Text = "DOWN"
+    downButton.Font = Enum.Font.SourceSansBold
+    downButton.TextSize = 22
+    downButton.BackgroundTransparency = 0.2
+    downButton.Parent = screenGui
+
+    -- กดปุ่ม Fly เพื่อเปิด/ปิดบิน
+    flyButton.MouseButton1Click:Connect(function()
+        flying = not flying
+        if flying then
+            hoverHeight = rootPart.Position.Y
+        else
+            moveUp = 0
+        end
+    end)
+
+    -- กดปุ่ม UP ค้าง = บินขึ้น
+    upButton.MouseButton1Down:Connect(function()
+        moveUp = 1
+    end)
+    upButton.MouseButton1Up:Connect(function()
+        moveUp = 0
+    end)
+
+    -- กดปุ่ม DOWN ค้าง = บินลง
+    downButton.MouseButton1Down:Connect(function()
+        moveUp = -1
+    end)
+    downButton.MouseButton1Up:Connect(function()
+        moveUp = 0
+    end)
+
+    return screenGui
 end
 
--- เรียกสร้าง GUI ตอนเริ่มเกม
 local flyGui = createFlyGui()
 local flyButton = flyGui:WaitForChild("FlyButton")
 
--- =========================
--- ฟังก์ชันเริ่ม/หยุดบินจริง ๆ
--- =========================
+---------------------------------------------------------------------
+-- ฟังก์ชันเริ่ม/หยุดบิน
+---------------------------------------------------------------------
 local function startFlying()
-	if bodyVel or bodyGyro then return end
+    if bodyVel or bodyGyro then return end
 
-	humanoid.PlatformStand = true
+    humanoid.PlatformStand = true
 
-	bodyVel = Instance.new("BodyVelocity")
-	bodyVel.MaxForce = Vector3.new(1e7, 1e7, 1e7)
-	bodyVel.Velocity = Vector3.new(0, 0, 0)
-	bodyVel.Parent = rootPart
+    bodyVel = Instance.new("BodyVelocity")
+    bodyVel.MaxForce = Vector3.new(1e7, 1e7, 1e7)
+    bodyVel.Velocity = Vector3.new(0, 0, 0)
+    bodyVel.Parent = rootPart
 
-	bodyGyro = Instance.new("BodyGyro")
-	bodyGyro.MaxTorque = Vector3.new(1e7, 1e7, 1e7)
-	bodyGyro.CFrame = rootPart.CFrame
-	bodyGyro.P = 1e5
-	bodyGyro.Parent = rootPart
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(1e7, 1e7, 1e7)
+    bodyGyro.CFrame = rootPart.CFrame
+    bodyGyro.P = 1e5
+    bodyGyro.Parent = rootPart
 end
 
 local function stopFlying()
-	humanoid.PlatformStand = false
+    humanoid.PlatformStand = false
 
-	if bodyVel then
-		bodyVel:Destroy()
-		bodyVel = nil
-	end
-	if bodyGyro then
-		bodyGyro:Destroy()
-		bodyGyro = nil
-	end
+    if bodyVel then
+        bodyVel:Destroy()
+        bodyVel = nil
+    end
+    if bodyGyro then
+        bodyGyro:Destroy()
+        bodyGyro = nil
+    end
 end
 
-local function toggleFlying()
-	flying = not flying
-	if flying then
-		hoverHeight = rootPart.Position.Y
-	end
-end
-
--- =========================
--- รับปุ่มคีย์บอร์ด (เสริมจาก GUI)
--- =========================
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if gameProcessed then return end
-
-	if input.KeyCode == Enum.KeyCode.F then
-		toggleFlying()
-	end
-
-	if input.KeyCode == Enum.KeyCode.W then
-		moveForward = 1
-	elseif input.KeyCode == Enum.KeyCode.S then
-		moveForward = -1
-	elseif input.KeyCode == Enum.KeyCode.A then
-		moveRight = -1
-	elseif input.KeyCode == Enum.KeyCode.D then
-		moveRight = 1
-	elseif input.KeyCode == Enum.KeyCode.Space then
-		moveUp = 1
-	elseif input.KeyCode == Enum.KeyCode.LeftControl then
-		moveUp = -1
-	end
-end)
-
-UserInputService.InputEnded:Connect(function(input, gameProcessed)
-	if gameProcessed then return end
-
-	if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.S then
-		moveForward = 0
-	elseif input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.D then
-		moveRight = 0
-	elseif input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.LeftControl then
-		moveUp = 0
-	end
-end)
-
--- =========================
+---------------------------------------------------------------------
 -- อัปเดตทุกเฟรม
--- =========================
+---------------------------------------------------------------------
 RunService.RenderStepped:Connect(function(dt)
-	-- อัปเดตข้อความบนปุ่ม
-	if flyButton then
-		flyButton.Text = flying and "Fly: ON" or "Fly: OFF"
-	end
+    if not character or not humanoid or not rootPart then return end
 
-	-- ถ้ายังไม่กดให้บิน ก็ปิดแรงทั้งหมด
-	if not flying then
-		if bodyVel or bodyGyro then
-			stopFlying()
-		end
-		return
-	end
+    -- อัปเดตข้อความบนปุ่ม
+    if flyButton then
+        flyButton.Text = flying and "Fly: ON" or "Fly: OFF"
+    end
 
-	-- ถ้าเริ่มบินแล้วแต่ยังไม่มี body* ให้สร้าง
-	if not bodyVel or not bodyGyro then
-		startFlying()
-	end
+    if not flying then
+        if bodyVel or bodyGyro then
+            stopFlying()
+        end
+        return
+    end
 
-	if not bodyVel or not bodyGyro then return end
+    if not bodyVel or not bodyGyro then
+        startFlying()
+    end
 
-	local camera = workspace.CurrentCamera
-	if not camera then return end
+    if not bodyVel or not bodyGyro then return end
 
-	local forward = camera.CFrame.LookVector
-	local right = camera.CFrame.RightVector
+    -- ใช้จอยซ้ายของ Roblox เป็นทิศทางบิน
+    local moveDir = humanoid.MoveDirection
+    local horizontal = Vector3.new(moveDir.X, 0, moveDir.Z)
+    if horizontal.Magnitude > 1 then
+        horizontal = horizontal.Unit
+    end
 
-	local moveDir = (forward * moveForward) + (right * moveRight)
-	if moveDir.Magnitude > 0 then
-		moveDir = moveDir.Unit
-	end
-	local horizontalVelocity = moveDir * flightSpeed
+    local horizontalVelocity = horizontal * flightSpeed
 
-	local yVel
-	if moveUp ~= 0 then
-		yVel = moveUp * flightSpeed
-	else
-		local diff = hoverHeight - rootPart.Position.Y
-		yVel = diff * 5
-	end
+    -- ขึ้น/ลง
+    local yVel
+    if moveUp ~= 0 then
+        yVel = moveUp * flightSpeed
+        hoverHeight = rootPart.Position.Y
+    else
+        local diff = hoverHeight - rootPart.Position.Y
+        yVel = diff * 5
+    end
 
-	bodyVel.Velocity = Vector3.new(horizontalVelocity.X, yVel, horizontalVelocity.Z)
+    bodyVel.Velocity = Vector3.new(horizontalVelocity.X, yVel, horizontalVelocity.Z)
 
-	local lookAt = Vector3.new(forward.X, 0, forward.Z)
-	if lookAt.Magnitude > 0 then
-		bodyGyro.CFrame = CFrame.new(rootPart.Position, rootPart.Position + lookAt)
-	end
+    -- หันตัวไปตามทิศที่บิน
+    local forward = horizontal.Magnitude > 0 and horizontal.Unit or rootPart.CFrame.LookVector
+    local lookAt = Vector3.new(forward.X, 0, forward.Z)
+    if lookAt.Magnitude > 0 then
+        bodyGyro.CFrame = CFrame.new(rootPart.Position, rootPart.Position + lookAt)
+    end
 end)
 
--- =========================
--- รีเซ็ตเมื่อรีสปอว์น
--- =========================
+---------------------------------------------------------------------
+-- รีเซ็ตตอนตัวละครตาย/รีสปอว์น
+---------------------------------------------------------------------
 player.CharacterAdded:Connect(function(char)
-	character = char
-	humanoid = character:WaitForChild("Humanoid")
-	rootPart = character:WaitForChild("HumanoidRootPart")
-	flying = false
-	stopFlying()
+    character = char
+    humanoid = character:WaitForChild("Humanoid")
+    rootPart = character:WaitForChild("HumanoidRootPart")
+
+    flying = false
+    moveUp = 0
+    stopFlying()
 end)
