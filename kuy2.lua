@@ -10,7 +10,7 @@ local rootPart = character:WaitForChild("HumanoidRootPart")
 
 -- ====== ตั้งค่าการบิน ======
 local flying = false
-local flightSpeed = 60
+local flightSpeed = 500
 local hoverHeight = rootPart.Position.Y
 local moveUp = 0
 
